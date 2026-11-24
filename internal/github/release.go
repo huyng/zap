@@ -22,10 +22,64 @@ func (r Release) String() string {
 	return fmt.Sprintf("%s/%s@%s", r.Owner, r.Repo, r.Tag)
 }
 
+// URL is the page a human would open for this release, and is what a receipt
+// records as its source.
+func (r Release) URL() string {
+	return fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", r.Owner, r.Repo, r.Tag)
+}
+
+// LatestRelease finds the newest non-draft, non-prerelease release of repo.
+//
+// Args:
+//
+//	ctx: request context.
+//	client: HTTP client to use; http.DefaultClient works.
+//	repo: the repository to look up.
+//
+// Returns:
+//
+//	The latest release, or an error when the repository has published none.
+func LatestRelease(ctx context.Context, client *http.Client, repo Repo) (Release, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", repo.Owner, repo.Name)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return Release{}, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return Release{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return Release{}, fmt.Errorf("%s has no published release", repo)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return Release{}, fmt.Errorf("GitHub API returned %s for %s", resp.Status, repo)
+	}
+
+	var payload struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return Release{}, err
+	}
+	if payload.TagName == "" {
+		return Release{}, fmt.Errorf("%s has no published release", repo)
+	}
+	return Release{Owner: repo.Owner, Repo: repo.Name, Tag: payload.TagName}, nil
+}
+
 // Asset is a downloadable file attached to a release.
 type Asset struct {
 	Name string
 	URL  string
+	// Digest is the "sha256:<hex>" string GitHub computes for an uploaded
+	// asset. It is empty for assets GitHub has not digested, in which case a
+	// checksum file published alongside is the fallback (§6.1).
+	Digest string
 }
 
 // ParseReleaseURL extracts the release identity from a URL like
@@ -53,8 +107,9 @@ func ParseReleaseURL(rawURL string) (Release, error) {
 // apiRelease is the subset of the GitHub release payload we use.
 type apiRelease struct {
 	Assets []struct {
-		Name string `json:"name"`
-		URL  string `json:"browser_download_url"`
+		Name   string `json:"name"`
+		URL    string `json:"browser_download_url"`
+		Digest string `json:"digest"`
 	} `json:"assets"`
 }
 
@@ -94,7 +149,7 @@ func FetchAssets(ctx context.Context, client *http.Client, rel Release) ([]Asset
 
 	assets := make([]Asset, 0, len(payload.Assets))
 	for _, a := range payload.Assets {
-		assets = append(assets, Asset{Name: a.Name, URL: a.URL})
+		assets = append(assets, Asset{Name: a.Name, URL: a.URL, Digest: a.Digest})
 	}
 	return assets, nil
 }

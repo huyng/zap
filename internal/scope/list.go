@@ -39,7 +39,7 @@ func (e Entry) Runnable() bool {
 //	The installed apps, or an error if the scope root itself cannot be read. A
 //	missing scope root is not an error; it holds no apps.
 func List(s Scope) ([]Entry, error) {
-	dirs, err := os.ReadDir(s.RootDir)
+	dirs, err := os.ReadDir(s.AppsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

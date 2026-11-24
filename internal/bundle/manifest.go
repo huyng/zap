@@ -174,10 +174,25 @@ func validEntrypoint(entry string) error {
 	return nil
 }
 
-// DeclaredEntrypoint returns the entrypoint an app.toml inside a tree declares,
-// without requiring the rest of that manifest to be valid. The other fields are
-// not read: a source tree's identity and version come from where it was fetched,
-// not from what it ships.
+// Declared is what an app.toml inside a source tree says about itself. Every
+// field is optional: a tree may ship no manifest, or one that is incomplete.
+type Declared struct {
+	// Entrypoint is the executable path the tree declares, relative to where
+	// the tree's files will land. Empty when none is declared.
+	Entrypoint string
+	// ID and Name are the identity the author chose, empty when unset.
+	ID   string
+	Name string
+}
+
+// DeclaredFromTree reads the identity and entrypoint an app.toml inside a tree
+// declares, without requiring the rest of that manifest to be valid.
+//
+// A tree's manifest is authored, so it may be incomplete or stale: `version` is
+// normally absent because the installer supplies it from the revision
+// installed (§2.1). A malformed file, or one declaring an invalid entrypoint or
+// id, is an error rather than something to ignore, so a typo surfaces here
+// instead of as a surprising app root.
 //
 // Args:
 //
@@ -186,28 +201,37 @@ func validEntrypoint(entry string) error {
 //
 // Returns:
 //
-//	The declared entrypoint; whether one was declared; and an error if the file
-//	is unreadable, malformed, or declares an invalid path.
-func DeclaredEntrypoint(treeDir string) (string, bool, error) {
+//	What the tree declares; zero when it holds no manifest. An error if the
+//	file is unreadable, malformed, or declares an invalid entrypoint or id.
+func DeclaredFromTree(treeDir string) (Declared, error) {
 	data, err := os.ReadFile(filepath.Join(treeDir, ManifestFile))
 	if errors.Is(err, fs.ErrNotExist) {
-		return "", false, nil
+		return Declared{}, nil
 	}
 	if err != nil {
-		return "", false, err
+		return Declared{}, err
 	}
 
 	var raw rawManifest
 	if err := toml.Unmarshal(data, &raw); err != nil {
-		return "", false, fmt.Errorf("parsing %s in the tree: %w", ManifestFile, err)
+		return Declared{}, fmt.Errorf("parsing %s in the tree: %w", ManifestFile, err)
 	}
-	if strings.TrimSpace(raw.Entrypoint) == "" {
-		return "", false, nil
+
+	d := Declared{}
+	if strings.TrimSpace(raw.Entrypoint) != "" {
+		if err := validEntrypoint(raw.Entrypoint); err != nil {
+			return Declared{}, err
+		}
+		d.Entrypoint = raw.Entrypoint
 	}
-	if err := validEntrypoint(raw.Entrypoint); err != nil {
-		return "", false, err
+	if strings.TrimSpace(raw.ID) != "" {
+		if err := ValidID(raw.ID); err != nil {
+			return Declared{}, err
+		}
+		d.ID = raw.ID
 	}
-	return raw.Entrypoint, true, nil
+	d.Name = strings.TrimSpace(raw.Name)
+	return d, nil
 }
 
 // Write encodes m as an app.toml at path.

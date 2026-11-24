@@ -19,6 +19,11 @@ func (r Repo) String() string {
 	return r.Owner + "/" + r.Name
 }
 
+// URL is the repository's page, and is what a receipt records as its source.
+func (r Repo) URL() string {
+	return "https://github.com/" + r.String()
+}
+
 // Source is one commit of a repository, used when a tool is installed from its
 // source tree rather than from a release asset.
 type Source struct {

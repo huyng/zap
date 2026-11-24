@@ -12,9 +12,18 @@ import (
 // ship one. It is used only for sources that are not already bundles: GitHub
 // release assets and repository source trees.
 type Builder struct {
+	// ID and Name are the identity to use when the tree declares none. A tree
+	// that ships its own app.toml overrides them, because the author knows the
+	// namespace the app is installed under (§2.3) and a rename of the source
+	// must not move an existing app root.
 	ID      string
 	Name    string
 	Version string
+	// OverrideID and OverrideName are chosen by the person running the install,
+	// so they beat the tree's own manifest. They apply only to a GitHub install,
+	// where the identity would otherwise be derived.
+	OverrideID   string
+	OverrideName string
 	// Flatten strips a single wrapper directory from the archive root, so a
 	// source tree cut by GitHub ({repo}-{sha}/...) becomes contents/ directly.
 	Flatten bool
@@ -22,11 +31,17 @@ type Builder struct {
 
 // Build unpacks an archive into destDir as a conforming bundle.
 //
-// The entrypoint is taken from an app.toml at the tree's root when it declares
-// one, and otherwise left unset. It is never inferred from which files happen to
-// carry an executable bit: guessing picks the wrong file as readily as the right
-// one, and a bundle whose single command does nothing is worse than one that
-// exposes nothing.
+// The identity and entrypoint are taken from an app.toml at the tree's root
+// when it declares them, and otherwise from the Builder: a source tree's own
+// manifest is the author's statement about the app, while the Builder holds
+// what was derived from where the tree was fetched. `version` always comes from
+// the Builder, since only the installer knows the revision it installed
+// (§2.1).
+//
+// The entrypoint is never inferred from which files happen to carry an
+// executable bit: guessing picks the wrong file as readily as the right one,
+// and a bundle whose single command does nothing is worse than one that exposes
+// nothing.
 //
 // Args:
 //
@@ -37,20 +52,28 @@ type Builder struct {
 //
 //	The manifest written for the new bundle.
 func (b Builder) Build(archivePath, destDir string) (*bundle.Manifest, error) {
+	m, _, err := b.build(archivePath, destDir)
+	return m, err
+}
+
+// build is Build, also reporting whether the tree's own manifest supplied the
+// identity. The installer logs that, because an authored id can name a
+// namespace the caller did not derive from where the tree came from.
+func (b Builder) build(archivePath, destDir string) (*bundle.Manifest, bool, error) {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Unpack into a scratch directory first so a wrapper level can be dropped
 	// before the tree becomes contents/.
 	scratch, err := os.MkdirTemp(destDir, ".unpack-")
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer os.RemoveAll(scratch)
 
 	if err := extractArchive(archivePath, scratch); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	tree := scratch
@@ -61,29 +84,45 @@ func (b Builder) Build(archivePath, destDir string) (*bundle.Manifest, error) {
 		}
 	}
 
-	entrypoint, _, err := bundle.DeclaredEntrypoint(tree)
+	declared, err := bundle.DeclaredFromTree(tree)
 	if err != nil {
-		return nil, fmt.Errorf("the tree's %s cannot be used: %w", bundle.ManifestFile, err)
+		return nil, false, fmt.Errorf("the tree's %s cannot be used: %w", bundle.ManifestFile, err)
 	}
 
 	contents := filepath.Join(destDir, bundle.ContentsDir)
 	if err := os.Rename(tree, contents); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	m := &bundle.Manifest{
 		ID:         b.ID,
 		Name:       b.Name,
 		Version:    b.Version,
-		Entrypoint: entrypoint,
+		Entrypoint: declared.Entrypoint,
+	}
+	if declared.ID != "" {
+		m.ID = declared.ID
+	}
+	if declared.Name != "" {
+		m.Name = declared.Name
+	}
+	if b.OverrideID != "" {
+		m.ID = b.OverrideID
+	}
+	if b.OverrideName != "" {
+		m.Name = b.OverrideName
 	}
 	if err := m.Validate(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if err := bundle.Write(m, filepath.Join(destDir, bundle.ManifestFile)); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return m, nil
+
+	// The identity came from the tree when it declared one and no flag
+	// overrode it.
+	fromTree := (declared.ID != "" && b.OverrideID == "") || (declared.Name != "" && b.OverrideName == "")
+	return m, fromTree, nil
 }
 
 // singleSubdir reports whether dir holds exactly one entry and that entry is a

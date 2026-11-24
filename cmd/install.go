@@ -19,11 +19,11 @@ import (
 )
 
 var installFlags struct {
-	system bool
-	root   string
-	force  bool
-	id     string
-	name   string
+	system  bool
+	appsDir string
+	force   bool
+	id      string
+	name    string
 }
 
 var installCmd = &cobra.Command{
@@ -44,10 +44,14 @@ tools that cut no releases. The version recorded is the short commit hash:
 Both GitHub forms are wrapped into a bundle first, then installed the same way
 as a bundle archive. The bundle id defaults to io.github.<owner>.<repo>.
 
-For a source tree or a release asset, the entrypoint comes from an app.toml at
-the tree's root when it declares one. zap never picks an entrypoint itself: a
-tree with no app.toml, or one that names no entrypoint, is installed as a
-payload with nothing exposed.`,
+For a source tree or a release asset, the identity and entrypoint come from an
+app.toml at the tree's root when it declares them. The tree's own id wins over
+the derived one, because the author knows the namespace the app lives in and a
+renamed repository should not move an installed app root. --id and --name win
+over both.
+
+zap never picks an entrypoint itself: a tree with no app.toml, or one that
+names no entrypoint, is installed as a payload with nothing exposed.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runInstall,
 }
@@ -57,14 +61,14 @@ func init() {
 
 	flags := installCmd.Flags()
 	flags.BoolVar(&installFlags.system, "system", false, "install at system scope (/opt/apps, /usr/local/bin)")
-	flags.StringVar(&installFlags.root, "root", "", "app root parent directory (default $APP_HOME or ~/.apps; /opt/apps with --system)")
+	flags.StringVar(&installFlags.appsDir, "apps-dir", "", "directory holding app roots (default $APP_HOME or ~/.apps; /opt/apps with --system)")
 	flags.BoolVar(&installFlags.force, "force", false, "replace an existing install, including its data/")
 	flags.StringVar(&installFlags.id, "id", "", "bundle id to use for a GitHub install (default io.github.<owner>.<repo>)")
 	flags.StringVar(&installFlags.name, "name", "", "bundle name to use for a GitHub install (default the repo name)")
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
-	sc, err := resolveScope(installFlags.system, installFlags.root)
+	sc, err := resolveScope(installFlags.system, installFlags.appsDir)
 	if err != nil {
 		return err
 	}
@@ -72,6 +76,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	installer := &install.Installer{
 		Scope: sc,
 		Force: installFlags.force,
+		Tool:  tool(),
 		Log:   cmd.OutOrStdout(),
 	}
 
@@ -104,6 +109,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "installed %s %s\n  root: %s\n", result.Manifest.ID, result.Manifest.Version, result.Root)
+	if result.Receipt != nil && result.Receipt.Source.URL != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "  from: %s\n", result.Receipt.Source.URL)
+	}
 	if result.Exposed != "" {
 		fmt.Fprintf(cmd.OutOrStdout(), "  link: %s\n", result.Exposed)
 	} else {
@@ -135,21 +143,19 @@ func httpClient() *http.Client {
 	return &http.Client{Timeout: 5 * time.Minute}
 }
 
-// builderFor picks the bundle identity for a GitHub install. The default id is
-// derived from the repository so repeat installs land on the same app root.
+// builderFor picks the bundle identity for a GitHub install. Three sources, in
+// increasing authority: the id derived from the repository, the identity the
+// tree's own app.toml declares, and an explicit --id or --name. The derived
+// default is namespaced to the repository so that repeat installs land on the
+// same app root without the tree having to declare anything.
 func builderFor(owner, repo, version string) install.Builder {
-	b := install.Builder{
-		ID:      "io.github." + sanitizeID(owner) + "." + sanitizeID(repo),
-		Name:    repo,
-		Version: version,
+	return install.Builder{
+		ID:           "io.github." + sanitizeID(owner) + "." + sanitizeID(repo),
+		Name:         repo,
+		Version:      version,
+		OverrideID:   installFlags.id,
+		OverrideName: installFlags.name,
 	}
-	if installFlags.id != "" {
-		b.ID = installFlags.id
-	}
-	if installFlags.name != "" {
-		b.Name = installFlags.name
-	}
-	return b
 }
 
 var idUnsafe = regexp.MustCompile(`[^a-z0-9._-]+`)
@@ -164,17 +170,17 @@ func sanitizeID(s string) string {
 // resolveScope decides where an install goes, reading the environment once at
 // the edge of the program.
 //
-// The app root follows the flag, the system default, or $APP_HOME and the home
-// directory in that order. The bin directory follows the scope alone: a system
-// install exposes into /usr/local/bin, a user install into ~/.local/bin.
-func resolveScope(system bool, rootFlag string) (scope.Scope, error) {
+// The apps directory follows the flag, the system default, or $APP_HOME and the
+// home directory in that order. The bin directory follows the scope alone: a
+// system install exposes into /usr/local/bin, a user install into ~/.local/bin.
+func resolveScope(system bool, appsDir string) (scope.Scope, error) {
 	resolved := scope.Scope{System: system}
 
 	switch {
-	case rootFlag != "":
-		resolved.RootDir = rootFlag
+	case appsDir != "":
+		resolved.AppsDir = appsDir
 	case system:
-		resolved.RootDir = "/opt/apps"
+		resolved.AppsDir = "/opt/apps"
 	default:
 		base := os.Getenv("APP_HOME")
 		if base == "" {
@@ -184,7 +190,7 @@ func resolveScope(system bool, rootFlag string) (scope.Scope, error) {
 			}
 			base = filepath.Join(home, ".apps")
 		}
-		resolved.RootDir = base
+		resolved.AppsDir = base
 	}
 
 	if system {

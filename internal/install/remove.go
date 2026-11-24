@@ -36,9 +36,9 @@ type RemoveResult struct {
 	KeptData string
 }
 
-// Remove uninstalls the app with the given id (§6): contents/, cache/, run/ and
-// app.toml go; data/ survives unless Purge is set. The exposure symlink or
-// wrapper is removed when it points into this root.
+// Remove uninstalls the app with the given id (§8): contents/, cache/, run/,
+// app.toml and receipt.toml go; data/ survives unless Purge is set. The
+// exposure symlink or wrapper is removed when it points into this root.
 //
 // Args:
 //
@@ -80,7 +80,7 @@ func (r *Remover) Remove(id string) (*RemoveResult, error) {
 	}
 
 	// Everything the layout owns except data/.
-	for _, name := range []string{bundle.ContentsDir, "cache", "run", bundle.ManifestFile} {
+	for _, name := range []string{bundle.ContentsDir, "cache", "run", bundle.ManifestFile, bundle.ReceiptFile} {
 		if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
 			return nil, err
 		}

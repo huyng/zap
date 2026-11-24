@@ -8,8 +8,8 @@ import (
 
 // Scope is where app roots and exposure links live (§1.1, §6).
 type Scope struct {
-	// RootDir holds one directory per app, e.g. ~/.apps.
-	RootDir string
+	// AppsDir holds one directory per app, e.g. ~/.apps.
+	AppsDir string
 	// BinDir receives the exposed entrypoint, e.g. ~/.local/bin.
 	BinDir string
 	// System selects system-scope exposure, which needs a wrapper that sets
@@ -19,7 +19,7 @@ type Scope struct {
 
 // Root is the app root for id.
 func (s Scope) Root(id string) string {
-	return filepath.Join(s.RootDir, id)
+	return filepath.Join(s.AppsDir, id)
 }
 
 // Link is where the exposed entrypoint for name would live.

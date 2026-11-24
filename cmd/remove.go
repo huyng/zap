@@ -8,10 +8,10 @@ import (
 )
 
 var removeFlags struct {
-	system bool
-	root   string
-	purge  bool
-	force  bool
+	system  bool
+	appsDir string
+	purge   bool
+	force   bool
 }
 
 var removeCmd = &cobra.Command{
@@ -31,13 +31,13 @@ func init() {
 
 	flags := removeCmd.Flags()
 	flags.BoolVar(&removeFlags.system, "system", false, "act on the system scope (/opt/apps, /usr/local/bin)")
-	flags.StringVar(&removeFlags.root, "root", "", "app root parent directory (default $APP_HOME or ~/.apps; /opt/apps with --system)")
+	flags.StringVar(&removeFlags.appsDir, "apps-dir", "", "directory holding app roots (default $APP_HOME or ~/.apps; /opt/apps with --system)")
 	flags.BoolVar(&removeFlags.purge, "purge", false, "also delete data/, losing user data")
 	flags.BoolVar(&removeFlags.force, "force", false, "remove the directory even if it holds no readable app.toml")
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
-	sc, err := resolveScope(removeFlags.system, removeFlags.root)
+	sc, err := resolveScope(removeFlags.system, removeFlags.appsDir)
 	if err != nil {
 		return err
 	}

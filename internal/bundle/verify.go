@@ -54,14 +54,35 @@ func VerifyDir(dir string) (*Manifest, error) {
 	// A bundle with no entrypoint is installed but exposes nothing (§2.2).
 	if m.Runnable() {
 		entry := m.EntryPath(dir)
-		info, err = os.Stat(entry) // follows symlinks, as §2 requires of entrypoint
-		if err != nil {
+		if err := CheckExecutable(entry); err != nil {
 			return nil, fmt.Errorf("%w: entrypoint %q does not resolve inside %s/: %s",
 				ErrNotABundle, m.Entrypoint, ContentsDir, err)
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-			return nil, fmt.Errorf("%w: entrypoint %q is not an executable file", ErrNotABundle, m.Entrypoint)
-		}
 	}
 	return m, nil
+}
+
+// CheckExecutable reports whether path resolves to a regular executable file.
+// It follows symlinks, as §2 requires of an entrypoint.
+//
+// Args:
+//
+//	path: the file to test.
+//
+// Returns:
+//
+//	An error if the path cannot be read, is not a regular file, or carries no
+//	executable bit.
+func CheckExecutable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", path)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("%s has no executable bit", path)
+	}
+	return nil
 }
