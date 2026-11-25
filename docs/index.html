@@ -92,6 +92,37 @@ zap bundle &lt;dir&gt; [--out dist]                      # pack a tree for relea
 	<code>--apps-dir &lt;dir&gt;</code> moves the parent directory,
 	<code>--system</code> selects the system scope.</p>
 
+	<h2>What can be installed</h2>
+
+	<p>From a bare GitHub repo to a bundle that describes itself. Nothing in
+	between needs arranging.</p>
+
+	<table>
+		<tr>
+			<td>A repository</td>
+			<td>Installs the default branch, versioned by commit hash.</td>
+		</tr>
+		<tr>
+			<td>A repository with <code>app.toml</code></td>
+			<td>Adds a linked command, under the id its author chose.</td>
+		</tr>
+		<tr>
+			<td>A release</td>
+			<td>Picks the asset for your platform and checks its checksum.</td>
+		</tr>
+		<tr>
+			<td>A release of bundles</td>
+			<td>Installed as they are, without a second wrapping.</td>
+		</tr>
+		<tr>
+			<td>An archive</td>
+			<td>Used as it stands.</td>
+		</tr>
+	</table>
+
+	<p>Each step is more the app knows about itself, and none is a prerequisite
+	for the one before.</p>
+
 	<h2>A bundle</h2>
 
 	<p>An archive holding exactly one <code>&lt;id&gt;/</code> directory, with an
