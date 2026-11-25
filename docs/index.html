@@ -9,119 +9,103 @@
 </head>
 <body>
 
-<header>
-	<div class="wrap">
-		<a class="wordmark" href="index.html">zap<span> / docs</span></a>
-		<nav>
-			<a href="index.html" aria-current="page">Overview</a>
-			<a href="commands.html">Commands</a>
-			<a href="bundles.html">Bundles</a>
-			<a href="conformance.html">Conformance</a>
-			<a href="https://github.com/huyng/zap">GitHub</a>
-		</nav>
-	</div>
-</header>
+<main>
 
-<main class="wrap">
+	<h1>zap</h1>
+	<p class="lede">A package manager for self-contained apps. An app is one
+	directory: installing puts it in place and links one command, removing deletes
+	it.</p>
 
-	<h1>A package manager for self-contained apps</h1>
-	<p>An app is one directory. Installing puts it in place and links one command.
-	Removing deletes it.</p>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh</code></pre>
 
-	<div class="install">
-		<p>Install</p>
-		<pre><code>curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh</code></pre>
-	</div>
+	<p>That downloads the release for your platform, checks its checksum, and
+	unpacks it to <code>~/.apps/io.github.huyng.zap/</code>, exposing
+	<code>zap</code> in <code>~/.local/bin</code>.</p>
 
-	<p>That downloads the release for your platform, checks the published
-	checksum, and unpacks it to <code>~/.apps/io.github.huyng.zap/</code>. Then:</p>
+	<h2>Use</h2>
 
 <pre><code>zap install https://github.com/neovim/neovim/releases/tag/v0.12.2
-zap list
-zap remove io.github.neovim.neovim</code></pre>
+zap install https://github.com/huyng/bashmarks     # a repo with no releases
+zap install ./my-tool.tar.gz                       # a bundle archive
 
-	<p>Nothing is compiled, configured or signed at install time.
-	<code>zap</code> unpacks a tree, checks it, puts it in place and makes one
-	symlink.</p>
-
-	<h2>What it does</h2>
-
-	<div class="cards">
-		<div class="card">
-			<h3>install</h3>
-			<p>Unpack a bundle, verify it, place it in a scope, link its entrypoint.</p>
-		</div>
-		<div class="card">
-			<h3>update</h3>
-			<p>Re-fetch whatever the install came from, swap the tree, keep the data.</p>
-		</div>
-		<div class="card">
-			<h3>remove</h3>
-			<p>Delete the tree and its record, keep <code>data/</code> unless purged.</p>
-		</div>
-		<div class="card">
-			<h3>bundle</h3>
-			<p>Pack an app tree into an archive you can publish as a release asset.</p>
-		</div>
-	</div>
-
-	<h2>What it deliberately leaves out</h2>
-
-	<p>No dependency resolution, no signing, no services, no build step. Each of
-	those is a different problem, and a manager that only moves directories stays
-	small enough to audit.</p>
-
-	<p>An app is expected to arrive self-contained: libraries and runtime included
-	in its tree, nothing fetched when it starts. That is the whole contract, and
-	it is why removing a directory is a complete uninstall.</p>
-
-	<h2>Where things go</h2>
+zap list [--origin]                                # what is installed
+zap update &lt;id&gt; | --all [--check]                  # fetch its source again
+zap remove &lt;id&gt; [--purge]                          # uninstall, keeping data/
+zap bundle &lt;dir&gt; [--out dist]                      # pack a tree for release</code></pre>
 
 	<table>
-		<tr>
-			<th>Scope</th>
-			<th>App roots</th>
-			<th>Exposed command</th>
-		</tr>
-		<tr>
-			<td>user</td>
+		<tr><th>Scope</th><th>App roots</th><th>Exposed command</th></tr>
+		<tr><td>user (default)</td>
 			<td><code>$APP_HOME</code> or <code>~/.apps</code></td>
-			<td><code>~/.local/bin</code></td>
-		</tr>
-		<tr>
-			<td>system</td>
+			<td><code>~/.local/bin</code></td></tr>
+		<tr><td>system (<code>--system</code>)</td>
 			<td><code>/opt/apps</code></td>
-			<td><code>/usr/local/bin</code></td>
-		</tr>
+			<td><code>/usr/local/bin</code></td></tr>
 	</table>
 
-	<p>The layout inside a root never changes between the two. See
-	<a href="conformance.html">Conformance</a> for how that maps onto the
-	specification.</p>
+	<p>Both flags on every command that touches app roots:
+	<code>--apps-dir &lt;dir&gt;</code> moves the parent directory,
+	<code>--system</code> selects the system scope.</p>
 
-	<div class="next">
-		<h3>Where to go next</h3>
-		<ul>
-			<li><a href="commands.html">Commands</a>
-				<span>Every command, every flag, and what the exit status means.</span></li>
-			<li><a href="bundles.html">Bundles</a>
-				<span>What <code>zap</code> installs, what it packs, and the shape of
-				<code>app.toml</code>.</span></li>
-			<li><a href="conformance.html">Conformance</a>
-				<span>How an install on disk matches the App Bundle Layout
-				Specification.</span></li>
-		</ul>
-	</div>
+	<h2>A bundle</h2>
+
+	<p>An archive holding exactly one <code>&lt;id&gt;/</code> directory, with an
+	<code>app.toml</code> beside a <code>contents/</code> tree:</p>
+
+<pre><code>org.example.tool/
+├── app.toml
+└── contents/bin/tool</code></pre>
+
+<pre><code>id = "org.example.tool"      # lowercase, dot-separated, names the app root
+name = "tool"
+version = "1.0.0"            # display metadata only, no ordering
+entrypoint = "bin/tool"      # optional: omit for a payload that runs nothing</code></pre>
+
+	<p>The tree is self-contained: libraries and runtime inside
+	<code>contents/</code>, nothing fetched when it starts. That is what makes
+	deleting the directory a complete uninstall.</p>
+
+	<h2>What an install looks like</h2>
+
+<pre><code>~/.apps/org.example.tool/
+├── app.toml          # from the bundle
+├── contents/         # from the bundle, replaced wholesale on upgrade
+├── receipt.toml      # written by zap: where it came from
+├── data/             # durable state, kept across upgrades and removals
+├── cache/            # regenerable
+└── run/              # session-scoped</code></pre>
+
+	<p><code>receipt.toml</code> records the source, the artifact's SHA-256 and
+	which <code>zap</code> installed it. It is what <code>update</code> reads to
+	decide what to fetch again, is never shipped inside a bundle, and is deleted
+	with the installation.</p>
+
+	<h2>What it leaves out</h2>
+
+	<p>No dependency resolution, signing, services, or build step. Each is a
+	different problem; a manager that only moves directories stays small enough to
+	audit. Compiling stays the project's job — a project assembles its tree, then
+	<code>zap bundle</code> packs it.</p>
+
+	<h2>Conformance</h2>
+
+	<p>An install is a conforming app root of the
+	<a href="https://github.com/huyng/app-bundle-spec">App Bundle Layout
+	Specification</a>, so the layout on disk is the specification rather than a
+	convention of <code>zap</code>'s own. Upgrades assemble the new tree in a
+	staging directory and rename it into place, so <code>contents/</code> is always
+	either the old tree or the new one and never a mixture.</p>
+
+	<p>Manifest, bundle and uninstall rules are the specification's. What
+	<code>zap</code> adds is <code>receipt.toml</code>, which the specification
+	defines as install state: written by the installer, opaque to the app, removed
+	with the installation.</p>
 
 </main>
 
 <footer>
-	<div class="wrap">
-		<p><code>zap</code> is Apache-2.0. It implements the
-		<a href="https://github.com/huyng/app-bundle-spec">App Bundle Layout
-		Specification</a>. Source and releases on
-		<a href="https://github.com/huyng/zap">GitHub</a>.</p>
-	</div>
+	<p><a href="https://github.com/huyng/zap">github.com/huyng/zap</a> ·
+	Apache-2.0</p>
 </footer>
 
 </body>
