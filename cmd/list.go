@@ -13,7 +13,6 @@ import (
 var listFlags struct {
 	system  bool
 	appsDir string
-	origin  bool
 }
 
 var listCmd = &cobra.Command{
@@ -33,7 +32,6 @@ func init() {
 	flags := listCmd.Flags()
 	flags.BoolVar(&listFlags.system, "system", false, "list the system scope (/opt/apps)")
 	flags.StringVar(&listFlags.appsDir, "apps-dir", "", "directory holding app roots (default $APP_HOME or ~/.apps; /opt/apps with --system)")
-	flags.BoolVar(&listFlags.origin, "origin", false, "also show where each app was installed from (receipt.toml)")
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -54,21 +52,13 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	header := "ID\tVERSION\tKIND\tNAME"
-	if listFlags.origin {
-		header += "\tORIGIN"
-	}
-	fmt.Fprintln(w, header)
+	fmt.Fprintln(w, "ID\tVERSION\tKIND\tNAME\tFROM")
 	for _, e := range entries {
 		if e.ReadErr != nil {
-			fmt.Fprintf(w, "%s\t?\tbroken\t%s\n", e.ID, e.ReadErr)
+			fmt.Fprintf(w, "%s\t?\tbroken\t%s\t-\n", e.ID, e.ReadErr)
 			continue
 		}
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", e.ID, e.Version, kindOf(e), e.Name)
-		if listFlags.origin {
-			row += "\t" + originOf(e.Root)
-		}
-		fmt.Fprintln(w, row)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", e.ID, e.Version, kindOf(e), e.Name, originOf(e.Root))
 	}
 	if err := w.Flush(); err != nil {
 		return err
@@ -86,9 +76,10 @@ func kindOf(e scope.Entry) string {
 	return "payload"
 }
 
-// originOf reads the receipt of an installed app (§6.1). It returns "-" when
-// there is no receipt, or one that records no source: an app can be installed
-// perfectly well without either.
+// originOf reads the receipt of an installed app (§6.1) and renders where it
+// came from. It returns "-" when there is no receipt, or one that records no
+// source: an app can be installed perfectly well without either, so an empty
+// column means "unknown", not "broken".
 func originOf(root string) string {
 	receipt, err := bundle.LoadReceipt(filepath.Join(root, bundle.ReceiptFile))
 	if err != nil || receipt == nil || receipt.Source.URL == "" {

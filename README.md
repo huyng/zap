@@ -1,169 +1,129 @@
-# zap
+# Zap
 
-Zap is a cross platform package manager for installing self-contained apps laid out as described by the [App Bundle File System Layout Specification](../app-bundle-spec/spec-1.1.md).
+Zap is a cross platform package manager written in Go for installing self-contained apps laid out as described by the [App Bundle File System Layout Specification](../app-bundle-spec/spec-1.1.md).
 
-An app is one directory: an `app.toml` manifest and a `contents/` tree. To
-install is to put that directory in place and link one executable; to remove is
-to delete it.
+Goals:
 
-Documentation: **https://huyng.github.io/zap**
+* We want cross-platform and cross-distro packaging that just works.
+* We want to make the process of building a package as simple as uploading a github repo.
+* We want to encourage the proliferation of self-contained apps. Files should not be sprayed across the file-system heirarchy.
+* We want to replace `curl install.sh | sh` with a more formalized package management system that just works across all distros and platforms.
 
 ## Install
 
-Install `zap` with the script.
+`zap` needs to be with this script.
 
 ```
 curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh
 ```
 
-The result is an app root at `~/.apps/io.github.huyng.zap/` (or under
-`$APP_HOME`), an exposed `zap` in `~/.local/bin`, and a `receipt.toml` recording
-where it came from — so `zap update io.github.huyng.zap` manages `zap` itself.
-Running the script again is an upgrade: `data/`, `cache/` and `run/` are kept.
+This downloads and unpack's the latest bundle package for zap into `~/.apps/io.github.huyng.zap` and creates a symlink for `~/.apps/io.github.huyng.zap/contents/bin/zap` in `~/.local/bin`
 
-The script takes no arguments; it always installs the latest release. A release
-that publishes no checksum is not installed.
-
-Then use it:
+## Usage
 
 ```
+# installs a bundle
 zap install <archive|github-url>
-zap list [--origin]
+
+# show all installed app bundles
+zap list
+
+# update a bundle or all bundles
 zap update [<id>...] | --all
+
+# remove an app bundle
 zap remove <id>
+
+# create a bundle from <dir> for release
 zap bundle <dir>
 ```
 
-### What can be installed
-
-- **A bundle archive** — a `.tar.gz`, `.tgz` or `.zip` whose root holds exactly
-  one `<id>/` directory containing `app.toml` and `contents/`. It is installed as
-  it is.
-- **A GitHub release** — the platform asset is downloaded, wrapped into a bundle
-  and installed:
-
-  ```
-  zap install https://github.com/neovim/neovim/releases/tag/v0.12.2
-  ```
-
-- **A GitHub repository** — the head of the default branch is downloaded,
-  wrapped into a bundle and installed. Useful for tools that cut no releases; the
-  version recorded is the short commit hash:
-
-  ```
-  zap install https://github.com/huyng/bashmarks
-  ```
-
-For GitHub installs the bundle id defaults to `io.github.<owner>.<repo>` and the
-name to the repository name. A tree that ships its own `app.toml` overrides
-both with the identity its author declared — that id is the stable one, so a
-rename or transfer of the repository does not move an installed app root.
-`--id` and `--name` override everything, for when you want a different name
-locally.
-
-Release downloads are checked against the digest the release publishes: the
-`digest` GitHub computes for the asset, or failing that a checksum file beside
-it (`foo.tar.gz.sha256sum`) or one covering the whole release (`SHA256SUMS`).
-A mismatch aborts before anything is installed. A release that publishes no
-digest is installed unverified, and `zap` says so rather than implying a check
-it did not make.
-
-`zap` never guesses an entrypoint. For releases and source trees it uses the one
-declared by an `app.toml` at the tree's root, if there is one. A tree with no
-manifest, or one that names no entrypoint, is installed as a payload with
-nothing exposed on your `PATH`.
-
 ### Where things go
+
+Zap installs bundle packages into one of two locations: `~/.apps` for the default user-scoped installations, and `/opt/apps` for system-scoped installations.
+
+Upon installation, if the bundle package contains an entrypoint, `zap` automatically create symlinks for the bundle's entrypoint into `~/.local/bin` and into `/usr/local/bin` for systemwide installation.
 
 | Scope | App roots | Linked executables |
 | --- | --- | --- |
 | user (default) | `$APP_HOME` or `~/.apps` | `~/.local/bin` |
 | system (`--system`) | `/opt/apps` | `/usr/local/bin` |
 
-`--apps-dir` overrides the directory holding app roots. Inside a user scope the
-entrypoint is a symlink into the app root; at system scope it is a small wrapper
-script that sets `APP_ROOT`, because a system install has no default base to
-compute paths from.
+### What can be installed
 
-### Removing
+From a simple git repo to pre-packaged binary distribution bundles, zap provides a smooth onramp for installing all of these project shapes:
 
-`zap remove <id>` deletes `app.toml`, `receipt.toml`, `contents/`, `cache/` and
-`run/`, and takes away the link or wrapper that `zap` installed. `data/` is
-kept, so a later install of the same id finds its data again. Pass `--purge` to
-delete `data/` as well.
+- **A GitHub repository** - Any git repo can be installed. The head of the default branch is downloaded, wrapped into a bundle and installed.
 
-Two safety valves: `--force` replaces an existing install (and its `data/`) or
-deletes a directory that has no readable `app.toml`; and an existing link is
-only removed when it really points into the root being removed.
+  ```
+  zap install https://github.com/foo/bar
+  ```
 
-### Knowing where an app came from
+- **A GitHub release** - the platform asset is downloaded, wrapped into a bundle
+  and installed:
 
-Every install writes `receipt.toml` beside `app.toml`: where the bundle came
-from, the digest of what was downloaded, and which `zap` installed it. It is
-never shipped in a bundle, is never read by the app, and is deleted with the
-installation, so it describes an install rather than an app.
+  ```
+  zap install https://github.com/neovim/neovim/releases/tag/v0.12.2
+  ```
 
-```toml
-[source]
-kind = "release"
-url = "https://github.com/neovim/neovim/releases/tag/v0.12.2"
-ref = "v0.12.2"
+- **A bundle archive** - Any `.tar.gz`, `.tgz` or `.zip` whose root conforms to the App Bundle File System Layout (holds exactly
+  one `<id>/` directory containing `app.toml` and `contents/`.
 
-[artifact]
-name = "nvim-linux-x86_64.tar.gz"
-sha256 = "9f2c…"
-fetched_at = "2025-11-24T09:14:02Z"
+  ```
+  # install a pre-packaged bundle from local filesystem
+  zap install example.tar.gz
 
-[installer]
-name = "zap"
-version = "0.1.0"
-at = "2025-11-24T09:14:03Z"
+  # install a pre-packed bundle from website
+  zap install http://example.com/foo/bar.tar.gz
+  ```
+
+
+### Removing bundles
+
+`zap remove <id>`
+
+The command above deletes the app located at `<id>` but retains user data inside its `data/` folder.
+
+`zap remove --purge <id>`
+
+The command above deletes everything including user data.
+
+### Updating installed bundles
+
+Bundles installed via github releases or github urls may be updated to the latest release or url using:
+
+`zap update <id>`
+
+example:
+
+```
+zap update io.github.huyng.zap
 ```
 
-`zap list --origin` shows it as a column.
-
-### Updating
-
-`zap update <id>` re-fetches whatever the receipt names and swaps in the new
-tree, keeping `data/`, `cache/` and `run/` untouched:
+All updatable bundles can be updated with the following:
 
 ```
-zap update io.github.huyng.bashmarks
 zap update --all
-zap update --check --all
 ```
 
-A `release` source follows the repository's latest release; a `repo` source
-follows the default branch; an `archive` source re-reads the same file. Since
-version strings carry no ordering, `update` reports that the source offers
-something *different*, not something newer, and `--check` says what it would do
-without installing.
-
-A source that now builds a different id is refused rather than installed over
-the existing app. An app with no receipt, or one whose archive has been deleted,
-cannot be updated: reinstall it to record where it came from.
+A Github `release` source updates to the repository's latest release.  A Github `repo` source updates to the latest commit of the default branch.
 
 ### Publishing a bundle
 
-`zap bundle <dir>` packs a tree into an archive you can publish as a release
-asset, and `zap install` unpacks it. The tree is either a bundle root
-(`app.toml` beside `contents/`) or a flat source tree (`app.toml` beside the
-files). A flat tree gets the one transform the spec allows: the manifest moves
-up, everything else moves down into `contents/`.
+`zap bundle <dir>` packs a directory tree into an archive you can publish as a release
+asset, and that `zap install` can unpack and install.
 
-```
+The directory tree may take any of the following forms:
+
+Either a bundle root (`app.toml` beside `contents/`) or a flat source tree (`app.toml` beside the
+files). Zap will automatically move `app.toml` to the right location when generating the bundle.
+
+ ```
 zap bundle build/io.github.huyng.zap --out dist
   archive: dist/io.github.huyng.zap-linux-arm64.tar.gz
 ```
 
-The archive always holds a single `<id>/` directory named from the manifest, so
-the directory you pass can be called anything. `--os` and `--arch` default to
-the machine you are on, and name the archive so `zap install <release-url>` can
-find it: the asset name is what picks a platform. Archives are reproducible, so
-the same tree always gives the same bytes.
-
-Compiling stays the project's job. A four-line make target assembles the tree
-and `zap bundle` packs it:
+It is the project's repsonsibility to compile the code and to author `app.toml`. `zap bundle` packs it:
 
 ```make
 ID := io.github.huyng.zap
@@ -173,56 +133,7 @@ bundle:
 	cp app.toml build/$(ID)/app.toml
 	zap bundle build/$(ID) --out dist --os linux --arch arm64
 ```
+## Further documentation
 
-## Layout of this repository
-
-```
-main.go              entrypoint
-cmd/                 command line: flags, scope defaults, command wiring
-internal/bundle/     reads, validates and verifies app.toml and bundle roots
-internal/github/     parses GitHub URLs, picks release assets, resolves heads
-internal/install/    install, wrap, extract, promote, expose and remove
-internal/pack/       packs an app tree into a bundle archive
-internal/scope/      where app roots and links live, and listing them
-```
-
-Configuration reaches the core as arguments: `install.Installer`,
-`install.Remover`, `pack.Options` and `scope.Scope` never read the environment.
-Only `cmd/` resolves `$APP_HOME`, the home directory, the platform tokens and
-the flag defaults.
-
-## Building
-
-```
-make build      # a host binary, ./zap
-make test       # go vet and go test
-make release    # one bundle archive per platform, with checksums, in dist/
-```
-
-`make bundle` assembles `build/<os>-<arch>/io.github.huyng.zap/` — an `app.toml`
-beside `contents/bin/zap` — and packs each one with `zap bundle`. The archives in
-`dist/` are what `install.sh` downloads and what `zap install <release-url>`
-installs. `VERSION` defaults to `git describe`; override it with
-`make release VERSION=v0.1.0`.
-
-Requires Go 1.25 or later.
-
-## Releasing
-
-Push a tag and the workflow does the rest:
-
-```
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-`.github/workflows/release.yml` runs the tests, builds the bundles for all four
-platforms, checks that each unpacked archive really is a bundle root with no
-`receipt.toml`, and publishes a GitHub release with the archives and their
-checksums attached. Re-running a failed job finishes the release rather than
-erroring on the tag already existing.
-
-To release without CI, run `make release VERSION=v0.1.0` and upload
-`dist/*.tar.gz` and `dist/*.sha256sum` to a release yourself. The checksums are
-not optional: `install.sh` verifies the archive against its published
-`.sha256sum`, and a release without one cannot be installed.
+* [Homepage & Docs](**https://huyng.github.io/zap**)
+* [DEVELOPMENT.md](DEVELOPMENT.md)
