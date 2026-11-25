@@ -11,13 +11,13 @@ Goals:
 
 ## Install
 
-`zap` needs to be with this script.
+Install `zap` with this script.
 
 ```
 curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh
 ```
 
-This downloads and unpack's the latest bundle package for zap into `~/.apps/io.github.huyng.zap` and creates a symlink for `~/.apps/io.github.huyng.zap/contents/bin/zap` in `~/.local/bin`
+This downloads and unpack's the latest bundle package for zap into `~/.apps/io.github.huyng.zap` and creates a symlink for `~/.apps/io.github.huyng.zap/contents/bin/zap` into `~/.local/bin`
 
 ## Usage
 
