@@ -1,30 +1,19 @@
 # zap
 
-A small package manager for self-contained apps laid out as described by the
-[App Bundle Layout Specification](../app-bundle-spec/spec-1.1.md).
+Zap is a crossplatform package manager installing and managing self-contained apps laid out as described by the [App Bundle Layout Specification](../app-bundle-spec/spec-1.1.md).
 
 An app is one directory: an `app.toml` manifest and a `contents/` tree. To
 install is to put that directory in place and link one executable; to remove is
-to delete it. `zap` does exactly that, and nothing more: it runs no install
-scripts and makes no changes outside the app root it owns.
+to delete it.
 
-Documentation: **https://huyng.github.io/zap** — commands, bundle format, and how
-an install maps onto the specification. The sources are in [`docs/`](docs/),
-published by GitHub Pages straight from that folder.
+Documentation: **https://huyng.github.io/zap**
 
 ## Install
 
-Install `zap` with the script. It downloads the release bundle for this
-platform, checks its checksum, and unpacks it as a conforming app root:
+Install `zap` with the script.
 
 ```
 curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh
-```
-
-That is the whole interface. To pin a release, pass its tag:
-
-```
-curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh -s v0.1.0
 ```
 
 The result is an app root at `~/.apps/io.github.huyng.zap/` (or under
