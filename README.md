@@ -135,5 +135,5 @@ bundle:
 ```
 ## Further documentation
 
-* [Homepage & Docs](**https://huyng.github.io/zap**)
+* [Homepage & Docs](https://huyng.github.io/zap)
 * [DEVELOPMENT.md](DEVELOPMENT.md)
