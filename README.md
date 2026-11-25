@@ -1,6 +1,6 @@
 # Zap
 
-Zap is a cross platform package manager written in Go for installing self-contained apps laid out as described by the [App Bundle File System Layout Specification](../app-bundle-spec/spec-1.1.md).
+Zap is a cross platform package manager written in Go for installing self-contained apps laid out as described by the [App Bundle File System Layout Specification](https://everyhue.me/app-bundle-spec/).
 
 Goals:
 
@@ -66,7 +66,7 @@ From a simple git repo to pre-packaged binary distribution bundles, zap provides
   zap install https://github.com/neovim/neovim/releases/tag/v0.12.2
   ```
 
-- **A bundle archive** - Any `.tar.gz`, `.tgz` or `.zip` whose root conforms to the App Bundle File System Layout (holds exactly
+- **A bundle archive** - Any `.tar.gz`, `.tgz` or `.zip` whose root conforms to the [App Bundle File System Layout](https://everyhue.me/app-bundle-spec/) (holds exactly
   one `<id>/` directory containing `app.toml` and `contents/`.
 
   ```
