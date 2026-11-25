@@ -9,7 +9,8 @@ to delete it. `zap` does exactly that, and nothing more: it runs no install
 scripts and makes no changes outside the app root it owns.
 
 Documentation: **https://huyng.github.io/zap** — commands, bundle format, and how
-an install maps onto the specification. The sources are in [`docs/`](docs/).
+an install maps onto the specification. The sources are in [`docs/`](docs/),
+published by GitHub Pages straight from that folder.
 
 ## Install
 
