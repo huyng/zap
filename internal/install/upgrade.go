@@ -136,17 +136,19 @@ func (u *Upgrader) fetch(ctx context.Context, client *http.Client, receipt *bund
 		return i.fetchArchive(receipt.Source.URL)
 
 	case "release":
-		rel, err := github.ParseReleaseURL(receipt.Source.URL)
+		// A receipt records either a fixed tag or .../releases/latest; update
+		// follows the latest release either way, since that is what a release
+		// source means.
+		repo, _, err := github.ParseReleaseSource(receipt.Source.URL)
 		if err != nil {
 			return nil, fmt.Errorf("reading the recorded release URL %q: %w", receipt.Source.URL, err)
 		}
-		repo := github.Repo{Owner: rel.Owner, Name: rel.Repo}
 
 		latest, err := github.LatestRelease(ctx, client, repo)
 		if err != nil {
 			return nil, err
 		}
-		b := Builder{ID: id, Name: rel.Repo, Version: latest.Tag}
+		b := Builder{ID: id, Name: repo.Name, Version: latest.Tag}
 		return i.fetchRelease(ctx, client, latest, b, goos, goarch)
 
 	case "repo":

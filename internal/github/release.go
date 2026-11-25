@@ -85,23 +85,58 @@ type Asset struct {
 // ParseReleaseURL extracts the release identity from a URL like
 // https://github.com/neovim/neovim/releases/tag/v0.12.2
 func ParseReleaseURL(rawURL string) (Release, error) {
-	const shape = "expected https://github.com/{owner}/{repo}/releases/tag/{tag}"
+	repo, tag, err := ParseReleaseSource(rawURL)
+	if err != nil {
+		return Release{}, err
+	}
+	if tag == "" {
+		return Release{}, fmt.Errorf("expected https://github.com/{owner}/{repo}/releases/tag/{tag}")
+	}
+	return Release{Owner: repo.Owner, Repo: repo.Name, Tag: tag}, nil
+}
+
+// ParseReleaseSource reads the repository and tag out of a release URL, in
+// either of the two forms an installer records:
+//
+//	https://github.com/{owner}/{repo}/releases/tag/{tag}
+//	https://github.com/{owner}/{repo}/releases/latest
+//
+// The tag is empty for the second form, which names whichever release is latest
+// rather than a fixed one; the caller resolves it when it needs a tag.
+//
+// Args:
+//
+//	rawURL: the release URL, with or without a scheme.
+//
+// Returns:
+//
+//	The repository, the tag (empty for "latest"), or an error describing the
+//	expected shapes.
+func ParseReleaseSource(rawURL string) (Repo, string, error) {
+	const shape = "expected https://github.com/{owner}/{repo}/releases/tag/{tag} or .../releases/latest"
 
 	s, ok := trimGitHubPrefix(rawURL)
 	if !ok {
-		return Release{}, fmt.Errorf("%s", shape)
+		return Repo{}, "", fmt.Errorf("%s", shape)
 	}
 
 	parts := strings.Split(strings.TrimSuffix(s, "/"), "/")
-	if len(parts) != 5 || parts[2] != "releases" || parts[3] != "tag" {
-		return Release{}, fmt.Errorf("%s", shape)
+	if len(parts) < 4 || parts[2] != "releases" {
+		return Repo{}, "", fmt.Errorf("%s", shape)
 	}
-	for _, p := range parts {
-		if p == "" {
-			return Release{}, fmt.Errorf("%s", shape)
-		}
+	if parts[0] == "" || parts[1] == "" {
+		return Repo{}, "", fmt.Errorf("%s", shape)
 	}
-	return Release{Owner: parts[0], Repo: parts[1], Tag: parts[4]}, nil
+	repo := Repo{Owner: parts[0], Name: parts[1]}
+
+	switch {
+	case len(parts) == 4 && parts[3] == "latest":
+		return repo, "", nil
+	case len(parts) == 5 && parts[3] == "tag" && parts[4] != "":
+		return repo, parts[4], nil
+	default:
+		return Repo{}, "", fmt.Errorf("%s", shape)
+	}
 }
 
 // apiRelease is the subset of the GitHub release payload we use.
