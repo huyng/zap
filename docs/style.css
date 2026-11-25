@@ -1,0 +1,310 @@
+/* zap documentation. One stylesheet, no build step, no JavaScript. */
+
+:root {
+	--ink: #1a1d21;
+	--muted: #5c6672;
+	--faint: #8b949e;
+	--rule: #e3e7ec;
+	--bg: #ffffff;
+	--panel: #f6f8fa;
+	--accent: #1f6feb;
+	--radius: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--ink: #e6edf3;
+		--muted: #9aa5b1;
+		--faint: #6e7781;
+		--rule: #262c33;
+		--bg: #0d1117;
+		--panel: #161b22;
+		--accent: #6cb6ff;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--ink);
+	font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.wrap {
+	margin: 0 auto;
+	max-width: 44rem;
+	padding: 0 1.5rem;
+}
+
+/* Header and footer ------------------------------------------------------ */
+
+header {
+	border-bottom: 1px solid var(--rule);
+}
+
+header .wrap {
+	align-items: baseline;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1.5rem;
+	padding-bottom: 1rem;
+	padding-top: 1rem;
+}
+
+.wordmark {
+	color: var(--ink);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 1.05rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	text-decoration: none;
+}
+
+.wordmark span {
+	color: var(--faint);
+	font-weight: 400;
+}
+
+nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.25rem;
+	margin-left: auto;
+}
+
+nav a {
+	color: var(--muted);
+	font-size: 0.9rem;
+	text-decoration: none;
+}
+
+nav a:hover,
+nav a[aria-current="page"] {
+	color: var(--ink);
+}
+
+footer {
+	border-top: 1px solid var(--rule);
+	color: var(--faint);
+	font-size: 0.85rem;
+	margin-top: 4rem;
+	padding: 1.5rem 0 3rem;
+}
+
+footer a {
+	color: var(--muted);
+}
+
+/* Headings and text ----------------------------------------------------- */
+
+main {
+	padding-top: 2.5rem;
+}
+
+h1 {
+	font-size: 2.1rem;
+	font-weight: 650;
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+	margin: 0 0 0.75rem;
+}
+
+h1 + p {
+	color: var(--muted);
+	font-size: 1.15rem;
+	margin: 0 0 2rem;
+}
+
+h2 {
+	border-top: 1px solid var(--rule);
+	font-size: 1.15rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	margin: 3rem 0 1rem;
+	padding-top: 2rem;
+}
+
+h3 {
+	font-size: 0.95rem;
+	font-weight: 600;
+	margin: 2rem 0 0.5rem;
+}
+
+p,
+ul,
+ol {
+	margin: 0 0 1rem;
+}
+
+li {
+	margin-bottom: 0.35rem;
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+strong {
+	font-weight: 600;
+}
+
+.lede {
+	color: var(--muted);
+}
+
+.note {
+	background: var(--panel);
+	border-left: 2px solid var(--rule);
+	color: var(--muted);
+	font-size: 0.92rem;
+	margin: 1.5rem 0;
+	padding: 0.85rem 1rem;
+}
+
+.note p:last-child {
+	margin-bottom: 0;
+}
+
+/* Code ------------------------------------------------------------------ */
+
+code {
+	background: var(--panel);
+	border-radius: 4px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.875em;
+	padding: 0.15em 0.35em;
+}
+
+pre {
+	background: var(--panel);
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	font-size: 0.875rem;
+	line-height: 1.55;
+	margin: 1.25rem 0;
+	overflow-x: auto;
+	padding: 0.9rem 1rem;
+}
+
+pre code {
+	background: none;
+	padding: 0;
+}
+
+/* Tables ---------------------------------------------------------------- */
+
+table {
+	border-collapse: collapse;
+	font-size: 0.92rem;
+	margin: 1.25rem 0;
+	width: 100%;
+}
+
+th,
+td {
+	border-bottom: 1px solid var(--rule);
+	padding: 0.5rem 0.75rem 0.5rem 0;
+	text-align: left;
+	vertical-align: top;
+}
+
+th {
+	color: var(--muted);
+	font-size: 0.8rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+td:first-child,
+th:first-child {
+	padding-left: 0;
+}
+
+tr:last-child td {
+	border-bottom: none;
+}
+
+/* Landing page ---------------------------------------------------------- */
+
+.install {
+	background: var(--panel);
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	margin: 2rem 0;
+	padding: 1rem 1.15rem;
+}
+
+.install p {
+	color: var(--muted);
+	font-size: 0.8rem;
+	letter-spacing: 0.04em;
+	margin: 0 0 0.5rem;
+	text-transform: uppercase;
+}
+
+.install pre {
+	background: none;
+	border: none;
+	margin: 0;
+	padding: 0;
+}
+
+.cards {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+	margin: 1.5rem 0;
+}
+
+.card {
+	border: 1px solid var(--rule);
+	border-radius: var(--radius);
+	padding: 1rem 1.1rem;
+}
+
+.card h3 {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.9rem;
+	margin: 0 0 0.4rem;
+}
+
+.card p {
+	color: var(--muted);
+	font-size: 0.9rem;
+	margin: 0;
+}
+
+.next {
+	border-top: 1px solid var(--rule);
+	margin-top: 3rem;
+	padding-top: 1.5rem;
+}
+
+.next ul {
+	list-style: none;
+	padding: 0;
+}
+
+.next li {
+	margin-bottom: 0.6rem;
+}
+
+.next span {
+	color: var(--faint);
+	display: block;
+	font-size: 0.85rem;
+}

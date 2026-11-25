@@ -8,6 +8,9 @@ install is to put that directory in place and link one executable; to remove is
 to delete it. `zap` does exactly that, and nothing more: it runs no install
 scripts and makes no changes outside the app root it owns.
 
+Documentation: **https://huyng.github.io/zap** — commands, bundle format, and how
+an install maps onto the specification. The sources are in [`docs/`](docs/).
+
 ## Install
 
 Install `zap` with the script. It downloads the release bundle for this

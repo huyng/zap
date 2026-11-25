@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conformance — zap</title>
+<meta name="description" content="How an install made by zap matches the App Bundle Layout Specification.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+	<div class="wrap">
+		<a class="wordmark" href="index.html">zap<span> / docs</span></a>
+		<nav>
+			<a href="index.html">Overview</a>
+			<a href="commands.html">Commands</a>
+			<a href="bundles.html">Bundles</a>
+			<a href="conformance.html" aria-current="page">Conformance</a>
+			<a href="https://github.com/huyng/zap">GitHub</a>
+		</nav>
+	</div>
+</header>
+
+<main class="wrap">
+
+	<h1>Conformance</h1>
+	<p>An app installed by <code>zap</code> is a conforming app root. That is the
+	whole point: the layout on disk is the specification, not a convention
+	<code>zap</code> invented.</p>
+
+	<h2>What an install looks like</h2>
+
+<pre><code>~/.apps/org.example.tool/
+├── app.toml          # manifest, 0644
+├── contents/         # immutable tree, 0755, never written at runtime
+├── receipt.toml      # zap's install record, 0644
+├── data/             # durable state; kept across upgrades and plain removals
+├── cache/            # regenerable; deletable at any time
+└── run/              # session-scoped; cleared or ignored at startup</code></pre>
+
+	<table>
+		<tr><th>Rule</th><th>How zap honours it</th></tr>
+		<tr>
+			<td>Root is <code>~/.apps/&lt;id&gt;</code> or
+			<code>/opt/apps/&lt;id&gt;</code>, mode 0700 or 0750</td>
+			<td><code>--apps-dir</code> and <code>$APP_HOME</code> move the parent;
+			<code>--system</code> selects 0750 and <code>/opt/apps</code>.</td>
+		</tr>
+		<tr>
+			<td><code>app.toml</code> and <code>contents/</code> are the bundle</td>
+			<td>Copied in as they arrived, after being verified.</td>
+		</tr>
+		<tr>
+			<td>Entrypoint resolves to an executable inside
+			<code>contents/</code></td>
+			<td>Checked before anything is placed. A bundle that fails the check is
+			not installed.</td>
+		</tr>
+		<tr>
+			<td>Exposure is a symlink, or a wrapper setting
+			<code>$APP_ROOT</code></td>
+			<td>A symlink into <code>contents/</code> at user scope; a small
+			<code>sh</code> wrapper at system scope, where no default base
+			exists.</td>
+		</tr>
+		<tr>
+			<td><code>data/</code>, <code>cache/</code>, <code>run/</code> are the
+			app's, created by it, never replaced by an upgrade</td>
+			<td>The swap moves them across from the old tree before discarding
+			it.</td>
+		</tr>
+	</table>
+
+	<h2>The swap</h2>
+
+	<p>An upgrade never writes into a live tree. The new tree is assembled in a
+	staging directory inside the same scope, the old root is renamed aside, and
+	the new one is renamed in. If the second rename fails the old root is put
+	back, so an interrupted upgrade leaves either the previous install or the new
+	one, never a mixture.</p>
+
+	<p><code>contents/</code> is therefore always either the old tree or the new
+	one. A native binary already running keeps its old inode until it exits.</p>
+
+	<h2>receipt.toml</h2>
+
+	<p>The one file <code>zap</code> adds to the layout, defined by the
+	specification as install state. It is written after the tree is in place,
+	never shipped in a bundle, never read by the app, and deleted with the
+	installation.</p>
+
+<pre><code>[source]
+  kind = "release"                # release, repo, or archive
+  url = "https://github.com/owner/tool/releases/tag/v1.0.0"
+  ref = "v1.0.0"                  # tag, or commit for kind = repo
+
+[artifact]
+  name = "org.example.tool-linux-arm64.tar.gz"
+  sha256 = "9f2c..."
+  fetched_at = "2025-11-24T09:14:02Z"
+
+[installer]
+  name = "zap"
+  version = "0.1.0"
+  at = "2025-11-24T09:14:03Z"</code></pre>
+
+	<p>No key is required and unknown keys are ignored, so the shape can grow
+	without breaking a reader. <code>zap list --origin</code> reads the first
+	table; <code>zap update</code> reads it to decide what to fetch again.</p>
+
+	<p>Like <code>id</code>, a receipt is a self-asserted record of what the
+	installer did, not a claim about what a bundle contains. It is not proof of
+	authorship, and nothing should treat it as one.</p>
+
+	<h2>What zap is not</h2>
+
+	<p><code>zap</code> behaves as an installer, not as an app. It writes into a
+	scope it did not create, which no confined app may do, so it is judged by the
+	specification's rules for installers: it produces app roots, and it honours
+	the mutability rules for the roots it places.</p>
+
+	<p>It does not interpret <code>data/</code>, run app code, register services,
+	restart daemons or migrate data. Data migration is the app's job, keyed off
+	its own schema marker.</p>
+
+	<h2>Getting the specification</h2>
+
+	<p>The normative document lives in
+	<a href="https://github.com/huyng/app-bundle-spec">huyng/app-bundle-spec</a>.
+	Where this page and that document disagree, the document is right.</p>
+
+</main>
+
+<footer>
+	<div class="wrap">
+		<p><a href="index.html">Overview</a> · <a href="commands.html">Commands</a> ·
+		<a href="bundles.html">Bundles</a> ·
+		<a href="https://github.com/huyng/zap">GitHub</a></p>
+	</div>
+</footer>
+
+</body>
+</html>

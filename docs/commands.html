@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commands — zap</title>
+<meta name="description" content="Every zap command, its flags, and what its exit status means.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+	<div class="wrap">
+		<a class="wordmark" href="index.html">zap<span> / docs</span></a>
+		<nav>
+			<a href="index.html">Overview</a>
+			<a href="commands.html" aria-current="page">Commands</a>
+			<a href="bundles.html">Bundles</a>
+			<a href="conformance.html">Conformance</a>
+			<a href="https://github.com/huyng/zap">GitHub</a>
+		</nav>
+	</div>
+</header>
+
+<main class="wrap">
+
+	<h1>Commands</h1>
+	<p>Five commands, one job each.</p>
+
+<pre><code>zap install &lt;archive|github-url&gt;
+zap list [--origin]
+zap update [&lt;id&gt;...] | --all
+zap remove &lt;id&gt;
+zap bundle &lt;dir&gt;</code></pre>
+
+	<h2>Common flags</h2>
+
+	<p>Every command that reads or writes app roots takes these.</p>
+
+	<table>
+		<tr><th>Flag</th><th>Effect</th></tr>
+		<tr>
+			<td><code>--apps-dir &lt;dir&gt;</code></td>
+			<td>Directory holding app roots, one per app. Defaults to
+			<code>$APP_HOME</code>, then <code>~/.apps</code>, or
+			<code>/opt/apps</code> with <code>--system</code>.</td>
+		</tr>
+		<tr>
+			<td><code>--system</code></td>
+			<td>Use the system scope: <code>/opt/apps</code> and
+			<code>/usr/local/bin</code>. Needs write access there, so usually
+			<code>sudo</code>.</td>
+		</tr>
+	</table>
+
+	<h2>install</h2>
+
+	<p>Takes three kinds of input.</p>
+
+	<ul>
+		<li>A bundle archive: <code>.tar.gz</code>, <code>.tgz</code> or
+		<code>.zip</code> whose root holds exactly one <code>&lt;id&gt;/</code>
+		directory.</li>
+		<li>A GitHub release URL, e.g.
+		<code>.../releases/tag/v0.12.2</code>. The asset matching this platform is
+		downloaded and wrapped.</li>
+		<li>A GitHub repository URL, e.g. <code>github.com/owner/repo</code>. The
+		head of the default branch is installed, versioned by its short commit
+		hash.</li>
+	</ul>
+
+	<table>
+		<tr><th>Flag</th><th>Effect</th></tr>
+		<tr><td><code>--force</code></td>
+			<td>Replace an existing install, <em>including its <code>data/</code></em>.
+			For an upgrade that keeps data, use <code>update</code>.</td></tr>
+		<tr><td><code>--id &lt;id&gt;</code></td>
+			<td>Bundle id to use for a GitHub install. Beats the id declared in the
+			tree's own <code>app.toml</code>.</td></tr>
+		<tr><td><code>--name &lt;name&gt;</code></td>
+			<td>Display name to use for a GitHub install.</td></tr>
+	</table>
+
+	<p>Identity for a GitHub install comes from, in order: <code>--id</code> and
+	<code>--name</code>; then whatever the tree's own <code>app.toml</code>
+	declares; then <code>io.github.&lt;owner&gt;.&lt;repo&gt;</code>. An authored id
+	wins over the derived one because it is the stable one: a repository that
+	changes hands does not move an installed app.</p>
+
+	<h2>list</h2>
+
+	<p>Reads the scopes' manifests and prints what is installed. A directory
+	holding no <code>app.toml</code> is not listed; what a plain removal leaves
+	behind is <code>data/</code> alone.</p>
+
+	<table>
+		<tr><th>Flag</th><th>Effect</th></tr>
+		<tr><td><code>--origin</code></td>
+			<td>Add a column showing where each app came from, read from its
+			<code>receipt.toml</code>.</td></tr>
+	</table>
+
+<pre><code>ID                         VERSION  KIND      NAME       ORIGIN
+io.github.huyng.bashmarks  f051b9d  payload   bashmarks  https://github.com/huyng/bashmarks@f051b9d
+io.github.neovim.neovim    v0.12.6  payload   neovim     https://github.com/neovim/neovim/releases/tag/v0.12.6</code></pre>
+
+	<h2>update</h2>
+
+	<p>Re-fetches whatever the install's <code>receipt.toml</code> names: the
+	latest release for a <code>release</code> source, the branch head for a
+	<code>repo</code> source, the same file for an <code>archive</code> source.</p>
+
+	<p>The new tree replaces <code>app.toml</code>, <code>contents/</code> and
+	<code>receipt.toml</code>. <code>data/</code>, <code>cache/</code> and
+	<code>run/</code> are moved across, so settings survive. An upgrade is refused
+	if the fetched bundle's id differs from the installed one.</p>
+
+	<table>
+		<tr><th>Flag</th><th>Effect</th></tr>
+		<tr><td><code>--all</code></td><td>Update every app in the scope.</td></tr>
+		<tr><td><code>--check</code></td>
+			<td>Report what would change, install nothing.</td></tr>
+	</table>
+
+	<div class="note">
+		<p>Version strings carry no ordering, so <code>update</code> reports a
+		source that offers something <em>different</em>, not something newer. A
+		project that republishes an older version is installed like any other
+		change; <code>--check</code> shows it before you commit to it.</p>
+	</div>
+
+	<p>An app installed without a receipt cannot be updated, and neither can one
+	whose archive has been deleted. Reinstall it to record where it came from.</p>
+
+	<h2>remove</h2>
+
+	<p>Deletes <code>app.toml</code>, <code>receipt.toml</code>,
+	<code>contents/</code>, <code>cache/</code> and <code>run/</code>, and takes
+	away the exposed command. <code>data/</code> is kept, so a later install of
+	the same id finds its settings again.</p>
+
+	<table>
+		<tr><th>Flag</th><th>Effect</th></tr>
+		<tr><td><code>--purge</code></td>
+			<td>Delete <code>data/</code> too. This loses user data.</td></tr>
+		<tr><td><code>--force</code></td>
+			<td>Remove the directory even when it holds no readable
+			<code>app.toml</code>.</td></tr>
+	</table>
+
+	<p>An exposed command is only removed when it really points into the root
+	being deleted. A symlink or wrapper that belongs to something else is left
+	alone.</p>
+
+	<h2>bundle</h2>
+
+	<p>Packs an app tree into a <code>.tar.gz</code> that installs with
+	<code>zap install</code>. The input is either a bundle root
+	(<code>app.toml</code> beside <code>contents/</code>) or a flat source tree
+	(<code>app.toml</code> beside the files). See
+	<a href="bundles.html">Bundles</a>.</p>
+
+	<table>
+		<tr><th>Flag</th><th>Effect</th></tr>
+		<tr><td><code>--out &lt;dir&gt;</code></td><td>Where to write the archive.
+			Defaults to the current directory.</td></tr>
+		<tr><td><code>--os &lt;token&gt;</code></td>
+			<td>Platform token in the archive name. Defaults to this machine's;
+			pass <code>""</code> to leave it out.</td></tr>
+		<tr><td><code>--arch &lt;token&gt;</code></td>
+			<td>Architecture token. Same default and empty-string rule.</td></tr>
+	</table>
+
+	<h2>Exit status</h2>
+
+	<p><code>0</code> when everything asked for was done. <code>1</code> when
+	anything failed, including one app out of a <code>--all</code> run: the other
+	apps are still attempted, and each failure is reported on its own line.</p>
+
+	<h2>Environment</h2>
+
+	<table>
+		<tr><th>Variable</th><th>Used for</th></tr>
+		<tr><td><code>APP_HOME</code></td>
+			<td>Directory holding app roots, same meaning as in the
+			specification. Overridden by <code>--apps-dir</code>; ignored with
+			<code>--system</code>.</td></tr>
+		<tr><td><code>HOME</code></td>
+			<td>Locating <code>~/.apps</code> and <code>~/.local/bin</code>.</td></tr>
+	</table>
+
+	<p><code>zap</code> sets <code>APP_ROOT</code> for apps it exposes at system
+	scope, through the wrapper script it writes. It never sets it for a user
+	install, where a symlink into the root is enough.</p>
+
+</main>
+
+<footer>
+	<div class="wrap">
+		<p><a href="index.html">Overview</a> · <a href="bundles.html">Bundles</a> ·
+		<a href="conformance.html">Conformance</a> ·
+		<a href="https://github.com/huyng/zap">GitHub</a></p>
+	</div>
+</footer>
+
+</body>
+</html>

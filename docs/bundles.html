@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bundles — zap</title>
+<meta name="description" content="What a zap bundle is, how app.toml describes it, and how to pack one.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+	<div class="wrap">
+		<a class="wordmark" href="index.html">zap<span> / docs</span></a>
+		<nav>
+			<a href="index.html">Overview</a>
+			<a href="commands.html">Commands</a>
+			<a href="bundles.html" aria-current="page">Bundles</a>
+			<a href="conformance.html">Conformance</a>
+			<a href="https://github.com/huyng/zap">GitHub</a>
+		</nav>
+	</div>
+</header>
+
+<main class="wrap">
+
+	<h1>Bundles</h1>
+	<p>A bundle is an app root before it is installed: a manifest and a tree,
+	packed into one archive.</p>
+
+	<h2>Anatomy</h2>
+
+<pre><code>my-tool-1.0.0.tar.gz
+└── org.example.tool
+    ├── app.toml
+    └── contents
+        └── bin
+            └── tool</code></pre>
+
+	<ul>
+		<li>Exactly one <code>&lt;id&gt;/</code> directory at the archive root, and
+		its name must equal the manifest's <code>id</code>.</li>
+		<li>Inside it, exactly <code>app.toml</code> and <code>contents/</code>.
+		Nothing else: no install scripts, no receipts, no stray files.</li>
+		<li><code>contents/</code> holds the whole app, self-contained. Nothing is
+		fetched when it runs.</li>
+	</ul>
+
+	<h2>app.toml</h2>
+
+	<p>TOML at the root of the bundle. Unknown keys are ignored. All paths are
+	relative to <code>contents/</code>, never absolute.</p>
+
+	<table>
+		<tr><th>Field</th><th>Required</th><th>Meaning</th></tr>
+		<tr><td><code>id</code></td><td>yes</td>
+			<td>Lowercase, dot-separated, at least two segments, characters
+			<code>a-z 0-9 . - _</code>. Stable across versions; it names the app
+			root, so changing it orphans the old one and its data.</td></tr>
+		<tr><td><code>name</code></td><td>yes</td>
+			<td>Human-readable name, shown by <code>zap list</code>.</td></tr>
+		<tr><td><code>version</code></td><td>yes</td>
+			<td>Opaque string. Display metadata only: no ordering, no compatibility
+			meaning.</td></tr>
+		<tr><td><code>entrypoint</code></td><td>no</td>
+			<td>Executable inside <code>contents/</code>, run in the foreground.
+			Omit it for a bundle that is data or resources only; such a bundle
+			installs but exposes nothing.</td></tr>
+		<tr><td><code>description</code></td><td>no</td><td>Short description.</td></tr>
+		<tr><td><code>license</code></td><td>no</td><td>SPDX identifier.</td></tr>
+		<tr><td><code>homepage</code></td><td>no</td><td>URL.</td></tr>
+		<tr><td><code>icon</code></td><td>no</td><td>Path inside <code>contents/</code>.</td></tr>
+		<tr><td><code>[mime] handles</code></td><td>no</td><td>File types the app opens.</td></tr>
+	</table>
+
+	<p>A minimal bundle:</p>
+
+<pre><code>id = "org.example.hello"
+name = "hello"
+version = "1.0.0"
+entrypoint = "bin/hello"</code></pre>
+
+	<h2>What zap accepts</h2>
+
+	<p>Three shapes install cleanly, and which one you have is decided by what is
+	inside, not by what you call it.</p>
+
+	<table>
+		<tr><th>Input</th><th>What zap does</th></tr>
+		<tr>
+			<td>An archive holding one <code>&lt;id&gt;/</code></td>
+			<td>Installed as it is. Its manifest is the truth, including its
+			version.</td>
+		</tr>
+		<tr>
+			<td>An archive holding a flat tree, with <code>app.toml</code> at the
+			root</td>
+			<td>The manifest moves up and everything else moves down into
+			<code>contents/</code>. The entrypoint comes from that manifest;
+			identity and version come from where the tree was fetched.</td>
+		</tr>
+		<tr>
+			<td>An archive with no manifest at all</td>
+			<td>Installed as a payload: one <code>contents/</code> and an
+			identifier, nothing exposed. <code>zap</code> never guesses an
+			entrypoint from which files happen to be executable.</td>
+		</tr>
+	</table>
+
+	<div class="note">
+		<p>A release asset that is already a bundle is adopted, not wrapped again.
+		That is how <code>zap</code> installs tools that publish bundles from
+		their own releases, itself included.</p>
+	</div>
+
+	<h2>Packing one</h2>
+
+<pre><code>zap bundle build/org.example.tool --out dist
+zap bundle build/org.example.tool --out dist --os linux --arch arm64</code></pre>
+
+	<p>Output is named <code>&lt;id&gt;-&lt;os&gt;-&lt;arch&gt;.tar.gz</code>. The
+	platform tokens matter: <code>zap install &lt;release-url&gt;</code> chooses
+	an asset by matching those words in the file name, so a release built without
+	them is invisible to it.</p>
+
+	<p>The archive always holds a single <code>&lt;id&gt;/</code> directory named
+	from the manifest, so the directory you pass can be called anything. Archives
+	are reproducible: entries are sorted and timestamps fixed, so the same tree
+	always produces the same bytes and a checksum stays meaningful.</p>
+
+	<p>A tar.gz is the only format written. It carries executable bits and
+	symlinks, which a bundle needs.</p>
+
+	<h2>Publishing a release</h2>
+
+	<p>A project builds its own tree, then packs it. Compiling stays the
+	project's job, because only it knows which files ship.</p>
+
+<pre><code>ID := org.example.tool
+
+bundle:
+	GOOS=linux GOARCH=arm64 go build -trimpath -o build/$(ID)/contents/bin/tool .
+	cp app.toml build/$(ID)/app.toml
+	zap bundle build/$(ID) --out dist --os linux --arch arm64</code></pre>
+
+	<p>Attach the archive and a <code>.sha256sum</code> beside it to a GitHub
+	release. <code>zap</code> verifies whatever the release publishes: the digest
+	GitHub computes for the asset, or a checksum file beside it
+	(<code>foo.tar.gz.sha256sum</code>), or one covering the whole release
+	(<code>SHA256SUMS</code>). A mismatch aborts before anything is installed.</p>
+
+	<h2>What gets installed</h2>
+
+<pre><code>~/.apps/org.example.tool
+├── app.toml        # from the bundle
+├── contents/       # from the bundle, replaced wholesale on upgrade
+├── receipt.toml    # written by zap: where it came from
+└── data/           # created by the app at runtime, kept across upgrades</code></pre>
+
+	<p><code>cache/</code> and <code>run/</code> appear the same way, as the app
+	needs them. All three of <code>data/</code>, <code>cache/</code> and
+	<code>run/</code> survive an upgrade untouched.</p>
+
+</main>
+
+<footer>
+	<div class="wrap">
+		<p><a href="index.html">Overview</a> · <a href="commands.html">Commands</a> ·
+		<a href="conformance.html">Conformance</a> ·
+		<a href="https://github.com/huyng/zap">GitHub</a></p>
+	</div>
+</footer>
+
+</body>
+</html>
