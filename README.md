@@ -1,6 +1,6 @@
 # zap
 
-Zap is a crossplatform package manager installing and managing self-contained apps laid out as described by the [App Bundle Layout Specification](../app-bundle-spec/spec-1.1.md).
+Zap is a cross platform package manager for installing self-contained apps laid out as described by the [App Bundle File System Layout Specification](../app-bundle-spec/spec-1.1.md).
 
 An app is one directory: an `app.toml` manifest and a `contents/` tree. To
 install is to put that directory in place and link one executable; to remove is
