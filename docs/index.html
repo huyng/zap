@@ -5,18 +5,63 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>zap — a package manager for self-contained apps</title>
 <meta name="description" content="zap installs self-contained apps: one directory per app, one linked command, no install scripts.">
+<meta name="theme-color" content="#07090f" id="theme-color">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="style.css">
+<script>
+	// Runs before first paint: a stored choice wins, otherwise follow the system
+	// setting. Kept inline and tiny so the theme is right on the first frame.
+	(function () {
+		var stored = null;
+		try {
+			stored = localStorage.getItem("zap-theme");
+		} catch (e) {
+			// Storage can be blocked; the system setting still works.
+		}
+		var theme = stored;
+		if (theme !== "dark" && theme !== "light") {
+			theme = window.matchMedia("(prefers-color-scheme: light)").matches
+				? "light"
+				: "dark";
+		}
+		document.documentElement.dataset.theme = theme;
+		var meta = document.getElementById("theme-color");
+		if (meta) {
+			meta.setAttribute("content", theme === "light" ? "#fdfcf8" : "#07090f");
+		}
+	})();
+</script>
 </head>
 <body>
 
+<button class="theme-toggle" type="button" aria-label="Switch theme">
+		<svg class="icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+			stroke-width="2" stroke-linecap="round" aria-hidden="true">
+			<circle cx="12" cy="12" r="4"></circle>
+			<path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"></path>
+		</svg>
+		<svg class="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+			stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+		</svg>
+	</button>
+
 <main>
 
-	<h1>zap</h1>
+	<div class="mark">
+		<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+			<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/>
+		</svg>
+		<h1>zap</h1>
+	</div>
+
 	<p class="lede">A package manager for self-contained apps. An app is one
 	directory: installing puts it in place and links one command, removing deletes
 	it.</p>
 
-<pre><code>curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh</code></pre>
+<pre class="install"><code>curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh</code></pre>
 
 	<p>That downloads the release for your platform, checks its checksum, and
 	unpacks it to <code>~/.apps/io.github.huyng.zap/</code>, exposing
@@ -107,6 +152,40 @@ entrypoint = "bin/tool"      # optional: omit for a payload that runs nothing</c
 	<p><a href="https://github.com/huyng/zap">github.com/huyng/zap</a> ·
 	Apache-2.0</p>
 </footer>
+
+<script>
+	(function () {
+		var root = document.documentElement;
+		var button = document.querySelector(".theme-toggle");
+
+		function label() {
+			// The button is labelled by what pressing it will do.
+			button.setAttribute(
+				"aria-label",
+				root.dataset.theme === "dark"
+					? "Switch to the light theme"
+					: "Switch to the dark theme"
+			);
+		}
+
+		button.addEventListener("click", function () {
+			var next = root.dataset.theme === "dark" ? "light" : "dark";
+			root.dataset.theme = next;
+			try {
+				localStorage.setItem("zap-theme", next);
+			} catch (e) {
+				// A blocked storage still lets the choice apply to this page.
+			}
+			var meta = document.getElementById("theme-color");
+			if (meta) {
+				meta.setAttribute("content", next === "light" ? "#fdfcf8" : "#07090f");
+			}
+			label();
+		});
+
+		label();
+	})();
+</script>
 
 </body>
 </html>
