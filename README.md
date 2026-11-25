@@ -21,8 +21,8 @@ The result is an app root at `~/.apps/io.github.huyng.zap/` (or under
 where it came from — so `zap update io.github.huyng.zap` manages `zap` itself.
 Running the script again is an upgrade: `data/`, `cache/` and `run/` are kept.
 
-A release that publishes no checksum is not installed, and a `zap` in
-`~/.local/bin` that is not a symlink is left alone rather than overwritten.
+The script takes no arguments; it always installs the latest release. A release
+that publishes no checksum is not installed.
 
 Then use it:
 
@@ -224,4 +224,5 @@ erroring on the tag already existing.
 
 To release without CI, run `make release VERSION=v0.1.0` and upload
 `dist/*.tar.gz` and `dist/*.sha256sum` to a release yourself. The checksums are
-not optional: `install.sh` refuses to install an archive it cannot verify.
+not optional: `install.sh` verifies the archive against its published
+`.sha256sum`, and a release without one cannot be installed.
