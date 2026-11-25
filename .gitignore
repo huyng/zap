@@ -1,6 +1,10 @@
 # Build output. The binary sits next to the source when you run `go build`.
 /zap
 
+# Release output: assembled app roots and the archives they pack into.
+/build/
+/dist/
+
 # Go test and profiling artifacts
 *.test
 *.out

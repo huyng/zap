@@ -10,6 +10,29 @@ scripts and makes no changes outside the app root it owns.
 
 ## Install
 
+Install `zap` with the script. It downloads the release bundle for this
+platform, checks its checksum, and unpacks it as a conforming app root:
+
+```
+curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh
+```
+
+That is the whole interface. To pin a release, pass its tag:
+
+```
+curl -fsSL https://raw.githubusercontent.com/huyng/zap/main/install.sh | sh -s v0.1.0
+```
+
+The result is an app root at `~/.apps/io.github.huyng.zap/` (or under
+`$APP_HOME`), an exposed `zap` in `~/.local/bin`, and a `receipt.toml` recording
+where it came from — so `zap update io.github.huyng.zap` manages `zap` itself.
+Running the script again is an upgrade: `data/`, `cache/` and `run/` are kept.
+
+A release that publishes no checksum is not installed, and a `zap` in
+`~/.local/bin` that is not a symlink is left alone rather than overwritten.
+
+Then use it:
+
 ```
 zap install <archive|github-url>
 zap list [--origin]
@@ -178,9 +201,34 @@ the flag defaults.
 ## Building
 
 ```
-go build -o zap .
-go test ./...
+make build      # a host binary, ./zap
+make test       # go vet and go test
+make release    # one bundle archive per platform, with checksums, in dist/
 ```
 
-Requires Go 1.25 or later. The `zap` file in this folder is a previous build
-output for macOS.
+`make bundle` assembles `build/<os>-<arch>/io.github.huyng.zap/` — an `app.toml`
+beside `contents/bin/zap` — and packs each one with `zap bundle`. The archives in
+`dist/` are what `install.sh` downloads and what `zap install <release-url>`
+installs. `VERSION` defaults to `git describe`; override it with
+`make release VERSION=v0.1.0`.
+
+Requires Go 1.25 or later.
+
+## Releasing
+
+Push a tag and the workflow does the rest:
+
+```
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` runs the tests, builds the bundles for all four
+platforms, checks that each unpacked archive really is a bundle root with no
+`receipt.toml`, and publishes a GitHub release with the archives and their
+checksums attached. Re-running a failed job finishes the release rather than
+erroring on the tag already existing.
+
+To release without CI, run `make release VERSION=v0.1.0` and upload
+`dist/*.tar.gz` and `dist/*.sha256sum` to a release yourself. The checksums are
+not optional: `install.sh` refuses to install an archive it cannot verify.

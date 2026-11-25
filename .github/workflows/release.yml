@@ -1,0 +1,84 @@
+name: release
+
+# Pushing a tag such as v0.1.0 publishes a release: one bundle archive per
+# platform plus a checksum for each, which is what install.sh and
+# `zap install <release-url>` download.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The Makefile reads the version from git describe, and the bundling
+          # step shells out to git, so the full history and tags are needed.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        run: make test
+
+      - name: Bundle
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: make release
+
+      - name: Check the archives install
+        run: |
+          # A release that is not installable should not be published: unpack
+          # each archive and confirm it is a bundle root with an entrypoint.
+          id=io.github.huyng.zap
+          for archive in dist/*.tar.gz; do
+            work=$(mktemp -d)
+            tar -xzf "$archive" -C "$work"
+
+            if [ ! -f "$work/$id/app.toml" ] || [ ! -d "$work/$id/contents" ]; then
+              echo "::error::$archive is not a bundle root"
+              exit 1
+            fi
+            if [ -e "$work/$id/receipt.toml" ]; then
+              echo "::error::$archive ships a receipt.toml, which bundles must not carry"
+              exit 1
+            fi
+
+            # Run the builder's own platform if it matches the runner.
+            case "$archive" in
+            *linux-amd64*)
+              if [ "$(uname -s)/$(uname -m)" = "Linux/x86_64" ]; then
+                "$work/$id/contents/bin/zap" --help >/dev/null || {
+                  echo "::error::$archive does not run on this runner"
+                  exit 1
+                }
+              fi
+              ;;
+            esac
+
+            rm -rf "$work"
+          done
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Re-running a failed job should finish the release, not fail on it.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" --clobber dist/*.tar.gz dist/*.sha256sum
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              dist/*.tar.gz \
+              dist/*.sha256sum
+          fi

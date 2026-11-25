@@ -84,6 +84,13 @@ func (b Builder) build(archivePath, destDir string) (*bundle.Manifest, bool, err
 		}
 	}
 
+	// An archive that already holds a conforming bundle is installed as that
+	// bundle rather than wrapped again, which is how a project that publishes
+	// bundles is installed from its own release assets.
+	if m, adopted, err := b.adoptBundle(tree, destDir); err != nil || adopted {
+		return m, false, err
+	}
+
 	declared, err := bundle.DeclaredFromTree(tree)
 	if err != nil {
 		return nil, false, fmt.Errorf("the tree's %s cannot be used: %w", bundle.ManifestFile, err)
@@ -123,6 +130,57 @@ func (b Builder) build(archivePath, destDir string) (*bundle.Manifest, bool, err
 	// overrode it.
 	fromTree := (declared.ID != "" && b.OverrideID == "") || (declared.Name != "" && b.OverrideName == "")
 	return m, fromTree, nil
+}
+
+// adoptBundle installs tree as-is when it holds exactly one conforming bundle
+// directory, moving that bundle's app.toml and contents/ into destDir.
+//
+// An identity override is applied here, since the bundle already carries a
+// manifest of its own; the version is left alone, because the shipped manifest
+// is the author's statement about which build this is (§2.1).
+//
+// Args:
+//
+//	tree: the extracted archive root.
+//	destDir: directory that will hold app.toml and contents/.
+//
+// Returns:
+//
+//	The manifest and true when tree held a bundle; nil and false when it did
+//	not, leaving destDir untouched so the caller can wrap the tree instead.
+func (b Builder) adoptBundle(tree, destDir string) (*bundle.Manifest, bool, error) {
+	root, ok := singleSubdir(tree)
+	if !ok {
+		return nil, false, nil
+	}
+
+	m, err := bundle.VerifyDir(root)
+	if err != nil {
+		// Not a bundle: the archive is a plain tree and will be wrapped.
+		return nil, false, nil
+	}
+
+	if b.OverrideID != "" || b.OverrideName != "" {
+		if b.OverrideID != "" {
+			m.ID = b.OverrideID
+		}
+		if b.OverrideName != "" {
+			m.Name = b.OverrideName
+		}
+		if err := m.Validate(); err != nil {
+			return nil, true, err
+		}
+		if err := bundle.Write(m, filepath.Join(root, bundle.ManifestFile)); err != nil {
+			return nil, true, err
+		}
+	}
+
+	for _, name := range []string{bundle.ManifestFile, bundle.ContentsDir} {
+		if err := os.Rename(filepath.Join(root, name), filepath.Join(destDir, name)); err != nil {
+			return nil, true, err
+		}
+	}
+	return m, true, nil
 }
 
 // singleSubdir reports whether dir holds exactly one entry and that entry is a

@@ -188,3 +188,95 @@ func TestBuildRejectsInvalidTreeManifest(t *testing.T) {
 		})
 	}
 }
+
+// bundleArchive writes a bundle-shaped archive: one <id>/ holding app.toml and
+// contents/, which is what a project publishes when it ships its own bundles.
+func bundleArchive(t *testing.T, dir string, files map[string]string) string {
+	t.Helper()
+
+	path := filepath.Join(dir, "bundle.tar.gz")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gz := gzip.NewWriter(f)
+	tw := tar.NewWriter(gz)
+
+	for name, body := range files {
+		hdr := &tar.Header{
+			Name: "org.example.prebuilt/" + name,
+			Mode: 0o755,
+			Size: int64(len(body)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tw.Write([]byte(body)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// TestBuildAdoptsPrebuiltBundle covers a release asset that already conforms: it
+// is installed as that bundle, not wrapped again, and its own version is kept.
+func TestBuildAdoptsPrebuiltBundle(t *testing.T) {
+	dir := t.TempDir()
+	archive := bundleArchive(t, dir, map[string]string{
+		bundle.ManifestFile: "id = \"org.example.prebuilt\"\nname = \"Prebuilt\"\nversion = \"1.2.3\"\nentrypoint = \"bin/tool\"\n",
+		"contents/bin/tool": "#!/bin/sh\necho hi\n",
+	})
+
+	out := filepath.Join(dir, "prepared")
+	m, err := Builder{ID: "io.github.owner.repo", Name: "repo", Version: "tag", Flatten: false}.
+		Build(archive, out)
+	if err != nil {
+		t.Fatalf("build failed: %v", err)
+	}
+
+	if m.ID != "org.example.prebuilt" || m.Version != "1.2.3" {
+		t.Errorf("the shipped manifest should be kept, got %q %q", m.ID, m.Version)
+	}
+
+	// Nothing is nested under contents/: the bundle was adopted as it stands.
+	if _, err := os.Stat(filepath.Join(out, bundle.ContentsDir, "bin", "tool")); err != nil {
+		t.Errorf("expected contents/bin/tool, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, bundle.ContentsDir, "org.example.prebuilt")); err == nil {
+		t.Error("the bundle was wrapped inside itself")
+	}
+	if _, err := bundle.VerifyDir(out); err != nil {
+		t.Errorf("adopted root should conform: %v", err)
+	}
+}
+
+// TestBuildWrapsPlainReleaseAsset covers an ordinary release asset: a tree with
+// no bundle around it is wrapped as before.
+func TestBuildWrapsPlainReleaseAsset(t *testing.T) {
+	dir := t.TempDir()
+	archive := makeSourceArchive(t, dir, map[string]string{
+		"bin/tool": "#!/bin/sh\necho hi\n",
+	})
+
+	out := filepath.Join(dir, "prepared")
+	m, err := Builder{ID: "io.github.owner.repo", Name: "repo", Version: "v1"}.Build(archive, out)
+	if err != nil {
+		t.Fatalf("build failed: %v", err)
+	}
+	if m.ID != "io.github.owner.repo" || m.Version != "v1" {
+		t.Errorf("expected the derived identity, got %q %q", m.ID, m.Version)
+	}
+	if _, err := bundle.VerifyDir(out); err != nil {
+		t.Errorf("wrapped root should conform: %v", err)
+	}
+}
