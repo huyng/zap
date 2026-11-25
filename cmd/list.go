@@ -52,7 +52,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tVERSION\tKIND\tNAME\tFROM")
+	fmt.Fprintln(w, "ID\tVERSION\tKIND\tNAME\tORIGIN")
 	for _, e := range entries {
 		if e.ReadErr != nil {
 			fmt.Fprintf(w, "%s\t?\tbroken\t%s\t-\n", e.ID, e.ReadErr)
